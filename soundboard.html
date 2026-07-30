@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Pads — Soundboard</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#14171A">
+<link rel="manifest" href="data:application/manifest+json,{&quot;name&quot;:&quot;Pads&quot;,&quot;short_name&quot;:&quot;Pads&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%2314171A&quot;,&quot;theme_color&quot;:&quot;%2314171A&quot;,&quot;start_url&quot;:&quot;.&quot;}">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2314171A'/%3E%3Ccircle cx='50' cy='50' r='30' fill='none' stroke='%23E8A33D' stroke-width='6'/%3E%3Cpolygon points='42,36 42,64 66,50' fill='%23E8A33D'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14171A;
+    --panel:#1E2228;
+    --panel-alt:#262B33;
+    --panel-hover:#2C323B;
+    --accent:#E8A33D;
+    --accent-soft:rgba(232,163,61,.16);
+    --accent-dim:rgba(232,163,61,.55);
+    --danger:#D65A4A;
+    --danger-soft:rgba(214,90,74,.16);
+    --text:#EDEBE6;
+    --text-muted:#8B92A0;
+    --text-dim:#5B6270;
+    --border:#2E333B;
+    --radius:18px;
+    --fade-ms:400;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    overscroll-behavior:none; user-select:none;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  h1,h2,h3, .display{font-family:'Space Grotesk',system-ui,sans-serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  #app{display:flex; flex-direction:column; height:100vh; height:100dvh;}
+
+  /* Header */
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 18px 10px; flex-shrink:0; gap:12px;
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-mark{
+    width:34px;height:34px;border-radius:9px;background:var(--accent);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .brand-mark svg{width:16px;height:16px;}
+  .brand-title{font-size:19px;font-weight:700;letter-spacing:.2px;}
+  .brand-sub{font-size:11px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase; margin-top:1px;}
+
+  .meter{display:flex; align-items:flex-end; gap:3px; height:22px;}
+  .meter i{
+    display:block; width:4px; border-radius:2px; background:var(--text-dim);
+    height:4px; transition:height .09s linear, background .2s linear;
+  }
+  .meter.live i{background:var(--accent);}
+
+  .edit-toggle{
+    display:flex; align-items:center; gap:8px; background:var(--panel);
+    border:1px solid var(--border); border-radius:100px; padding:6px 6px 6px 12px;
+    font-size:12.5px; color:var(--text-muted); cursor:pointer; flex-shrink:0;
+  }
+  .edit-toggle .sw{
+    width:34px;height:20px;border-radius:100px;background:var(--panel-alt);
+    position:relative; transition:background .15s;
+  }
+  .edit-toggle .sw::after{
+    content:''; position:absolute; top:2px; left:2px; width:16px; height:16px;
+    border-radius:50%; background:var(--text-dim); transition:transform .15s, background .15s;
+  }
+  .edit-toggle.on{color:var(--accent);}
+  .edit-toggle.on .sw{background:var(--accent-soft);}
+  .edit-toggle.on .sw::after{transform:translateX(14px); background:var(--accent);}
+
+  /* Folder tabs */
+  .folders{
+    display:flex; gap:8px; padding:8px 18px 14px; overflow-x:auto; flex-shrink:0;
+    -ms-overflow-style:none; scrollbar-width:none;
+  }
+  .folders::-webkit-scrollbar{display:none;}
+  .folder-chip{
+    display:flex; align-items:center; gap:7px; padding:9px 15px; border-radius:100px;
+    background:var(--panel); border:1px solid var(--border); color:var(--text-muted);
+    font-size:14px; font-weight:500; white-space:nowrap; cursor:pointer; flex-shrink:0;
+    transition:background .12s, color .12s, border-color .12s;
+  }
+  .folder-chip .fx{font-size:15px;}
+  .folder-chip.active{background:var(--accent-soft); border-color:var(--accent-dim); color:var(--accent);}
+  .folder-chip .del{
+    margin-left:2px; width:16px;height:16px;border-radius:50%;background:var(--danger-soft);
+    color:var(--danger); display:flex;align-items:center;justify-content:center;font-size:11px;
+  }
+  .folder-chip.add{background:transparent; border-style:dashed; color:var(--text-dim);}
+
+  /* Grid */
+  main{flex:1; overflow-y:auto; padding:4px 18px 130px;}
+  .empty{
+    margin-top:60px; text-align:center; color:var(--text-dim); font-size:14px; line-height:1.6;
+  }
+  .empty b{color:var(--text-muted); display:block; font-size:16px; margin-bottom:4px; font-weight:600;}
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(128px,1fr)); gap:12px;
+  }
+  .pad{
+    position:relative; aspect-ratio:1/1; border-radius:var(--radius); background:var(--panel);
+    border:1px solid var(--border); display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:8px; cursor:pointer; padding:10px;
+    transition:background .1s, border-color .1s, transform .06s;
+  }
+  .pad:active{transform:scale(.96);}
+  .pad:hover{background:var(--panel-hover);}
+  .pad .icon{font-size:34px; line-height:1;}
+  .pad .name{
+    font-size:12.5px; font-weight:600; text-align:center; color:var(--text);
+    max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;
+  }
+  .pad .led{
+    position:absolute; top:10px; right:10px; width:8px; height:8px; border-radius:50%;
+    background:var(--panel-alt); box-shadow:inset 0 0 0 1px var(--border);
+  }
+  .pad.playing{border-color:var(--accent-dim); background:var(--accent-soft);}
+  .pad.playing .led{background:var(--accent); box-shadow:0 0 8px 1px var(--accent-dim); animation:pulse 1.1s ease-in-out infinite;}
+  .pad .mode-tag{
+    position:absolute; bottom:8px; left:8px; font-size:9px; color:var(--text-dim);
+    letter-spacing:.04em;
+  }
+  @keyframes pulse{0%,100%{opacity:1} 50%{opacity:.45}}
+
+  .pad.edit-mode .icon,.pad.edit-mode .name{opacity:.55;}
+  .pad .edit-btn{
+    position:absolute; inset:0; border-radius:var(--radius); background:rgba(20,23,26,.72);
+    display:none; align-items:center; justify-content:center; gap:16px;
+  }
+  .pad.edit-mode .edit-btn{display:flex;}
+  .pad .edit-btn .ic{
+    width:38px;height:38px;border-radius:50%; display:flex;align-items:center;justify-content:center;
+    background:var(--panel-alt); border:1px solid var(--border); font-size:16px;
+  }
+  .pad .edit-btn .ic.del{background:var(--danger-soft); color:var(--danger); border-color:transparent;}
+
+  .add-pad{
+    aspect-ratio:1/1; border-radius:var(--radius); border:1.5px dashed var(--border);
+    display:flex; align-items:center; justify-content:center; color:var(--text-dim);
+    font-size:28px; cursor:pointer; background:transparent; transition:border-color .12s, color .12s;
+  }
+  .add-pad:hover{border-color:var(--accent-dim); color:var(--accent);}
+
+  /* Stop button */
+  .stopbar{
+    position:fixed; left:0; right:0; bottom:0; display:flex; justify-content:center;
+    padding:0 0 calc(20px + env(safe-area-inset-bottom)); pointer-events:none;
+  }
+  .stopbtn{
+    pointer-events:auto; display:flex; align-items:center; gap:10px; background:var(--danger);
+    color:#fff; border:none; border-radius:100px; padding:15px 26px; font-size:14.5px;
+    font-weight:700; letter-spacing:.03em; box-shadow:0 8px 24px rgba(214,90,74,.35);
+    cursor:pointer; font-family:'Space Grotesk',sans-serif; transition:opacity .15s, transform .1s;
+  }
+  .stopbtn:active{transform:scale(.97);}
+  .stopbtn:disabled{opacity:.35; box-shadow:none;}
+  .stopbtn .sq{width:12px;height:12px;background:#fff;border-radius:3px;flex-shrink:0;}
+
+  /* Modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(10,11,13,.65); backdrop-filter:blur(3px);
+    display:flex; align-items:flex-end; justify-content:center; z-index:50;
+    opacity:0; pointer-events:none; transition:opacity .18s;
+  }
+  .overlay.show{opacity:1; pointer-events:auto;}
+  @media (min-width:640px){ .overlay{align-items:center;} }
+  .sheet{
+    width:100%; max-width:440px; background:var(--panel); border:1px solid var(--border);
+    border-radius:22px 22px 0 0; padding:20px 20px calc(20px + env(safe-area-inset-bottom));
+    max-height:88vh; overflow-y:auto; transform:translateY(16px); transition:transform .18s;
+  }
+  @media (min-width:640px){ .sheet{border-radius:22px; transform:translateY(0) scale(.97);} }
+  .overlay.show .sheet{transform:translateY(0) scale(1);}
+  .sheet h2{margin:0 0 16px; font-size:18px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:12.5px; color:var(--text-muted); margin-bottom:7px; font-weight:600; letter-spacing:.02em;}
+  .field input[type=text]{
+    width:100%; background:var(--panel-alt); border:1px solid var(--border); border-radius:11px;
+    padding:12px 13px; color:var(--text); font-size:15px; font-family:inherit;
+  }
+  .field input[type=text]:focus{outline:none; border-color:var(--accent-dim);}
+  .emoji-row{display:flex; flex-wrap:wrap; gap:8px;}
+  .emoji-opt{
+    width:42px;height:42px;border-radius:11px; background:var(--panel-alt); border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center; font-size:20px; cursor:pointer;
+  }
+  .emoji-opt.sel{border-color:var(--accent); background:var(--accent-soft);}
+  .filebtn{
+    display:flex; align-items:center; gap:10px; background:var(--panel-alt); border:1px solid var(--border);
+    border-radius:11px; padding:12px 13px; cursor:pointer; font-size:14px; color:var(--text-muted);
+  }
+  .filebtn.has{color:var(--text); border-color:var(--accent-dim);}
+  .filebtn .ic{color:var(--accent); flex-shrink:0;}
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    background:var(--panel-alt); border:1px solid var(--border); border-radius:11px; padding:13px;
+  }
+  .toggle-row .t{font-size:13.5px; font-weight:600;}
+  .toggle-row .d{font-size:12px; color:var(--text-dim); margin-top:3px; line-height:1.4;}
+  .switch{width:42px;height:25px;border-radius:100px;background:var(--panel); position:relative; flex-shrink:0; cursor:pointer; border:1px solid var(--border);}
+  .switch::after{content:'';position:absolute; top:2px; left:2px; width:19px;height:19px;border-radius:50%; background:var(--text-dim); transition:transform .15s, background .15s;}
+  .switch.on{background:var(--accent-soft); border-color:var(--accent-dim);}
+  .switch.on::after{transform:translateX(17px); background:var(--accent);}
+  .sheet-actions{display:flex; gap:10px; margin-top:6px;}
+  .btn{
+    flex:1; padding:13px; border-radius:12px; border:none; font-size:14.5px; font-weight:700;
+    cursor:pointer; font-family:'Space Grotesk',sans-serif; letter-spacing:.02em;
+  }
+  .btn.primary{background:var(--accent); color:#1a1206;}
+  .btn.primary:disabled{opacity:.35;}
+  .btn.ghost{background:var(--panel-alt); color:var(--text-muted); border:1px solid var(--border);}
+  .btn.danger{background:var(--danger-soft); color:var(--danger);}
+  .hint{font-size:11.5px; color:var(--text-dim); margin-top:20px; text-align:center; line-height:1.5;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#1a1206" stroke-width="1.6"/><polygon points="10,8 10,16 16,12" fill="#1a1206"/></svg>
+      </div>
+      <div>
+        <div class="brand-title">Pads</div>
+        <div class="brand-sub" id="folderCount">—</div>
+      </div>
+    </div>
+    <div class="meter" id="meter"></div>
+    <div class="edit-toggle" id="editToggle">
+      <span id="editLabel">Editar</span>
+      <span class="sw"></span>
+    </div>
+  </header>
+
+  <div class="folders" id="folders"></div>
+
+  <main>
+    <div id="empty" class="empty" style="display:none">
+      <b>No hay sonidos acá todavía</b>
+      Tocá el + para agregar tu primer audio.
+    </div>
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <div class="stopbar">
+    <button class="stopbtn" id="stopBtn" disabled>
+      <span class="sq"></span> Detener todo
+    </button>
+  </div>
+</div>
+
+<!-- Modal: folder -->
+<div class="overlay" id="folderOverlay">
+  <div class="sheet">
+    <h2 id="folderModalTitle">Nueva carpeta</h2>
+    <div class="field">
+      <label>Nombre</label>
+      <input type="text" id="folderName" placeholder="Ej: Efectos, Fiesta, Intro...">
+    </div>
+    <div class="field">
+      <label>Ícono</label>
+      <div class="emoji-row" id="folderEmojiRow"></div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="folderCancel">Cancelar</button>
+      <button class="btn primary" id="folderSave">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: button -->
+<div class="overlay" id="padOverlay">
+  <div class="sheet">
+    <h2 id="padModalTitle">Nuevo sonido</h2>
+    <div class="field">
+      <label>Nombre</label>
+      <input type="text" id="padName" placeholder="Ej: Aplausos, Intro, Tema principal...">
+    </div>
+    <div class="field">
+      <label>Ícono</label>
+      <div class="emoji-row" id="padEmojiRow"></div>
+    </div>
+    <div class="field">
+      <label>Audio</label>
+      <label class="filebtn" id="padFileBtn">
+        <span class="ic">♪</span>
+        <span id="padFileLabel">Elegir archivo de audio</span>
+      </label>
+      <input type="file" accept="audio/*" id="padFileInput" style="display:none">
+    </div>
+    <div class="field">
+      <div class="toggle-row" id="padInterruptRow">
+        <div>
+          <div class="t">Interrumpe el sonido actual</div>
+          <div class="d">Si está activo, para lo que esté sonando antes de reproducirse. Si lo apagás, suena en simultáneo con lo demás.</div>
+        </div>
+        <div class="switch on" id="padInterruptSwitch"></div>
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="padCancel">Cancelar</button>
+      <button class="btn primary" id="padSave" disabled>Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const FADE_MS = 400;
+  const EMOJIS_PAD = ['🎵','🎶','🥁','🎺','🎸','🔊','🎉','😂','👏','⚡','🔥','💥','🚨','🐸','🚀','⏱️','🌊','🎤','🎬','❤️'];
+  const EMOJIS_FOLDER = ['📁','🎵','🎬','🎉','⚡','🎮','🎙️','📻','🐾','🏆'];
+
+  /* ---------- Storage (IndexedDB, with in-memory fallback) ---------- */
+  let db = null, memMode = false;
+  let mem = { folders: [], buttons: [] };
+
+  function openDB(){
+    return new Promise((resolve)=>{
+      if (!('indexedDB' in window)) { memMode = true; return resolve(null); }
+      let req;
+      try { req = indexedDB.open('pads-soundboard', 1); }
+      catch(e){ memMode = true; return resolve(null); }
+      req.onupgradeneeded = (e) => {
+        const _db = e.target.result;
+        if (!_db.objectStoreNames.contains('folders')) _db.createObjectStore('folders', {keyPath:'id'});
+        if (!_db.objectStoreNames.contains('buttons')) _db.createObjectStore('buttons', {keyPath:'id'});
+      };
+      req.onsuccess = (e) => resolve(e.target.result);
+      req.onerror = () => { memMode = true; resolve(null); };
+    });
+  }
+
+  function dbGetAll(store){
+    if (memMode) return Promise.resolve(mem[store].slice());
+    return new Promise((resolve)=>{
+      const tx = db.transaction(store,'readonly');
+      const req = tx.objectStore(store).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+  }
+  function dbPut(store, obj){
+    if (memMode){
+      const arr = mem[store]; const i = arr.findIndex(x=>x.id===obj.id);
+      if (i>=0) arr[i]=obj; else arr.push(obj);
+      return Promise.resolve();
+    }
+    return new Promise((resolve)=>{
+      const tx = db.transaction(store,'readwrite');
+      tx.objectStore(store).put(obj);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  }
+  function dbDelete(store, id){
+    if (memMode){
+      mem[store] = mem[store].filter(x=>x.id!==id);
+      return Promise.resolve();
+    }
+    return new Promise((resolve)=>{
+      const tx = db.transaction(store,'readwrite');
+      tx.objectStore(store).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  }
+
+  function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : 'id-'+Date.now()+'-'+Math.random().toString(16).slice(2)); }
+
+  /* ---------- State ---------- */
+  let folders = [];
+  let buttons = [];
+  let currentFolderId = null;
+  let editMode = false;
+  const players = new Map(); // buttonId -> {audio, gain, source, analyser, endTimer}
+  let audioCtx = null;
+
+  function getAudioCtx(){
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  /* ---------- Audio engine ---------- */
+  function stopPlayer(buttonId, fade){
+    const p = players.get(buttonId);
+    if (!p) return;
+    players.delete(buttonId);
+    clearTimeout(p.fadeOutTimer);
+    const ctx = p.ctx;
+    if (fade){
+      const now = ctx.currentTime;
+      try{
+        p.gain.gain.cancelScheduledValues(now);
+        p.gain.gain.setValueAtTime(p.gain.gain.value, now);
+        p.gain.gain.linearRampToValueAtTime(0.0001, now + FADE_MS/1000);
+      }catch(e){}
+      setTimeout(()=>{ try{ p.audio.pause(); }catch(e){} }, FADE_MS + 30);
+    } else {
+      try{ p.audio.pause(); }catch(e){}
+    }
+    updatePadUI(buttonId, false);
+  }
+
+  function stopAll(fade){
+    Array.from(players.keys()).forEach(id => stopPlayer(id, fade));
+    refreshStopBtn();
+  }
+
+  function playButton(btn){
+    if (!btn.audioBlob) return;
+    const ctx = getAudioCtx();
+
+    // retrigger: stop this same pad's own instance immediately (quick fade)
+    if (players.has(btn.id)) stopPlayer(btn.id, true);
+
+    // interrupt behavior: stop every other currently playing pad
+    if (btn.interrupt){
+      Array.from(players.keys()).forEach(id => { if (id !== btn.id) stopPlayer(id, true); });
+    }
+
+    const url = URL.createObjectURL(btn.audioBlob);
+    const audio = new Audio(url);
+    audio.preload = 'auto';
+    let source, gain, analyser;
+    try{
+      source = ctx.createMediaElementSource(audio);
+      gain = ctx.createGain();
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 32;
+      gain.gain.value = 0.0001;
+      source.connect(gain);
+      gain.connect(analyser);
+      analyser.connect(ctx.destination);
+    }catch(e){ console.error(e); return; }
+
+    const p = { audio, gain, source, analyser, ctx, fadeOutTimer:null };
+    players.set(btn.id, p);
+
+    audio.addEventListener('canplay', ()=>{
+      audio.play().catch(()=>{});
+      const now = ctx.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(1, now + FADE_MS/1000);
+    }, {once:true});
+
+    audio.addEventListener('timeupdate', ()=>{
+      if (!isFinite(audio.duration)) return;
+      const remaining = audio.duration - audio.currentTime;
+      if (remaining <= (FADE_MS/1000) + 0.05 && !p.fadingOut){
+        p.fadingOut = true;
+        const now = ctx.currentTime;
+        try{
+          gain.gain.cancelScheduledValues(now);
+          gain.gain.setValueAtTime(gain.gain.value, now);
+          gain.gain.linearRampToValueAtTime(0.0001, now + Math.max(remaining,0.05));
+        }catch(e){}
+      }
+    });
+
+    audio.addEventListener('ended', ()=>{
+      players.delete(btn.id);
+      URL.revokeObjectURL(url);
+      updatePadUI(btn.id, false);
+      refreshStopBtn();
+    });
+
+    updatePadUI(btn.id, true);
+    refreshStopBtn();
+  }
+
+  function refreshStopBtn(){
+    document.getElementById('stopBtn').disabled = players.size === 0;
+  }
+
+  function updatePadUI(buttonId, playing){
+    const el = document.querySelector(`.pad[data-id="${buttonId}"]`);
+    if (el) el.classList.toggle('playing', playing);
+  }
+
+  /* ---------- Level meter (signature element) ---------- */
+  const meterEl = document.getElementById('meter');
+  const BAR_COUNT = 10;
+  for (let i=0;i<BAR_COUNT;i++){ const b=document.createElement('i'); meterEl.appendChild(b); }
+  const bars = Array.from(meterEl.children);
+  const meterData = new Uint8Array(16);
+  function meterLoop(){
+    let level = 0;
+    if (players.size){
+      let sum = 0, n = 0;
+      players.forEach(p=>{
+        p.analyser.getByteFrequencyData(meterData);
+        let s=0; for (let i=0;i<meterData.length;i++) s+=meterData[i];
+        sum += s/meterData.length; n++;
+      });
+      level = n ? sum/n/255 : 0;
+    }
+    meterEl.classList.toggle('live', players.size>0);
+    bars.forEach((b,i)=>{
+      const wave = Math.sin(Date.now()/150 + i*0.9) * 0.15;
+      const target = players.size ? Math.max(4, (level + wave) * 22) : 4;
+      b.style.height = Math.max(4, Math.min(22, target)) + 'px';
+    });
+    requestAnimationFrame(meterLoop);
+  }
+  requestAnimationFrame(meterLoop);
+
+  /* ---------- Rendering ---------- */
+  function renderFolders(){
+    const wrap = document.getElementById('folders');
+    wrap.innerHTML = '';
+    folders.forEach(f=>{
+      const chip = document.createElement('div');
+      chip.className = 'folder-chip' + (f.id===currentFolderId ? ' active':'');
+      chip.innerHTML = `<span class="fx">${f.icon}</span><span>${escapeHtml(f.name)}</span>`;
+      if (editMode){
+        const del = document.createElement('span');
+        del.className = 'del'; del.textContent = '×';
+        del.onclick = (e)=>{ e.stopPropagation(); deleteFolder(f.id); };
+        chip.appendChild(del);
+      }
+      chip.onclick = ()=>{ currentFolderId = f.id; renderFolders(); renderGrid(); };
+      wrap.appendChild(chip);
+    });
+    const add = document.createElement('div');
+    add.className = 'folder-chip add';
+    add.innerHTML = `<span class="fx">+</span><span>Carpeta</span>`;
+    add.onclick = openNewFolderModal;
+    wrap.appendChild(add);
+
+    const cur = folders.find(f=>f.id===currentFolderId);
+    document.getElementById('folderCount').textContent = cur ? `${folders.length} carpeta${folders.length===1?'':'s'} · ${buttons.filter(b=>b.folderId===currentFolderId).length} sonidos` : '';
+  }
+
+  function renderGrid(){
+    const grid = document.getElementById('grid');
+    const empty = document.getElementById('empty');
+    grid.innerHTML = '';
+    const list = buttons.filter(b=>b.folderId===currentFolderId);
+    empty.style.display = (list.length===0) ? 'block' : 'none';
+
+    list.forEach(btn=>{
+      const pad = document.createElement('div');
+      pad.className = 'pad' + (editMode ? ' edit-mode':'') + (players.has(btn.id) ? ' playing':'');
+      pad.dataset.id = btn.id;
+      pad.innerHTML = `
+        <div class="led"></div>
+        <div class="icon">${btn.icon}</div>
+        <div class="name">${escapeHtml(btn.name)}</div>
+        <div class="mode-tag mono">${btn.interrupt ? 'CORTA' : 'CAPA'}</div>
+        <div class="edit-btn">
+          <div class="ic edit" title="Editar">✎</div>
+          <div class="ic del" title="Eliminar">🗑</div>
+        </div>`;
+      pad.querySelector('.edit-btn .edit').onclick = (e)=>{ e.stopPropagation(); openEditPadModal(btn); };
+      pad.querySelector('.edit-btn .del').onclick = (e)=>{ e.stopPropagation(); deleteButton(btn.id); };
+      pad.addEventListener('click', ()=>{ if (!editMode) playButton(btn); });
+      grid.appendChild(pad);
+    });
+
+    const addTile = document.createElement('div');
+    addTile.className = 'add-pad';
+    addTile.textContent = '+';
+    addTile.onclick = openNewPadModal;
+    grid.appendChild(addTile);
+
+    renderFolders();
+  }
+
+  function escapeHtml(s){
+    return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  /* ---------- Folder CRUD ---------- */
+  let folderEditingId = null;
+  function openNewFolderModal(){
+    folderEditingId = null;
+    document.getElementById('folderModalTitle').textContent = 'Nueva carpeta';
+    document.getElementById('folderName').value = '';
+    buildEmojiRow('folderEmojiRow', EMOJIS_FOLDER, EMOJIS_FOLDER[0]);
+    showOverlay('folderOverlay');
+  }
+  async function deleteFolder(id){
+    if (!confirm('¿Eliminar esta carpeta y todos sus sonidos?')) return;
+    const toDelete = buttons.filter(b=>b.folderId===id);
+    for (const b of toDelete){ stopPlayer(b.id,false); await dbDelete('buttons', b.id); }
+    buttons = buttons.filter(b=>b.folderId!==id);
+    await dbDelete('folders', id);
+    folders = folders.filter(f=>f.id!==id);
+    if (currentFolderId === id) currentFolderId = folders[0] ? folders[0].id : null;
+    renderFolders(); renderGrid();
+  }
+
+  document.getElementById('folderCancel').onclick = ()=>hideOverlay('folderOverlay');
+  document.getElementById('folderSave').onclick = async ()=>{
+    const name = document.getElementById('folderName').value.trim();
+    if (!name) return;
+    const icon = getSelectedEmoji('folderEmojiRow') || EMOJIS_FOLDER[0];
+    const f = { id: uid(), name, icon };
+    await dbPut('folders', f);
+    folders.push(f);
+    currentFolderId = f.id;
+    hideOverlay('folderOverlay');
+    renderFolders(); renderGrid();
+  };
+
+  /* ---------- Button CRUD ---------- */
+  let padEditingId = null, pendingBlob = null, pendingFileName = '';
+  function openNewPadModal(){
+    if (!currentFolderId){ alert('Primero creá una carpeta.'); return; }
+    padEditingId = null; pendingBlob = null; pendingFileName='';
+    document.getElementById('padModalTitle').textContent = 'Nuevo sonido';
+    document.getElementById('padName').value = '';
+    document.getElementById('padFileLabel').textContent = 'Elegir archivo de audio';
+    document.getElementById('padFileBtn').classList.remove('has');
+    setInterruptSwitch(true);
+    buildEmojiRow('padEmojiRow', EMOJIS_PAD, EMOJIS_PAD[0]);
+    validatePadForm();
+    showOverlay('padOverlay');
+  }
+  function openEditPadModal(btn){
+    padEditingId = btn.id; pendingBlob = btn.audioBlob; pendingFileName = btn.fileName || 'audio guardado';
+    document.getElementById('padModalTitle').textContent = 'Editar sonido';
+    document.getElementById('padName').value = btn.name;
+    document.getElementById('padFileLabel').textContent = pendingFileName;
+    document.getElementById('padFileBtn').classList.add('has');
+    setInterruptSwitch(btn.interrupt);
+    buildEmojiRow('padEmojiRow', EMOJIS_PAD, btn.icon);
+    validatePadForm();
+    showOverlay('padOverlay');
+  }
+  function setInterruptSwitch(on){
+    document.getElementById('padInterruptSwitch').classList.toggle('on', on);
+  }
+  document.getElementById('padInterruptRow').onclick = (e)=>{
+    if (e.target.closest('.switch') === null && e.target.id !== 'padInterruptRow') { /* allow row click too */ }
+    const sw = document.getElementById('padInterruptSwitch');
+    sw.classList.toggle('on');
+  };
+  document.getElementById('padFileBtn').onclick = ()=> document.getElementById('padFileInput').click();
+  document.getElementById('padFileInput').onchange = (e)=>{
+    const f = e.target.files[0];
+    if (!f) return;
+    pendingBlob = f; pendingFileName = f.name;
+    document.getElementById('padFileLabel').textContent = f.name;
+    document.getElementById('padFileBtn').classList.add('has');
+    validatePadForm();
+  };
+  document.getElementById('padName').oninput = validatePadForm;
+  function validatePadForm(){
+    const name = document.getElementById('padName').value.trim();
+    document.getElementById('padSave').disabled = !(name && pendingBlob);
+  }
+  document.getElementById('padCancel').onclick = ()=>hideOverlay('padOverlay');
+  document.getElementById('padSave').onclick = async ()=>{
+    const name = document.getElementById('padName').value.trim();
+    if (!name || !pendingBlob) return;
+    const icon = getSelectedEmoji('padEmojiRow') || EMOJIS_PAD[0];
+    const interrupt = document.getElementById('padInterruptSwitch').classList.contains('on');
+    if (padEditingId){
+      const btn = buttons.find(b=>b.id===padEditingId);
+      btn.name = name; btn.icon = icon; btn.interrupt = interrupt;
+      btn.audioBlob = pendingBlob; btn.fileName = pendingFileName;
+      await dbPut('buttons', btn);
+      stopPlayer(btn.id, false);
+    } else {
+      const btn = { id: uid(), folderId: currentFolderId, name, icon, interrupt, audioBlob: pendingBlob, fileName: pendingFileName };
+      await dbPut('buttons', btn);
+      buttons.push(btn);
+    }
+    hideOverlay('padOverlay');
+    renderGrid();
+  };
+  async function deleteButton(id){
+    if (!confirm('¿Eliminar este sonido?')) return;
+    stopPlayer(id, false);
+    await dbDelete('buttons', id);
+    buttons = buttons.filter(b=>b.id!==id);
+    renderGrid();
+  }
+
+  /* ---------- Emoji picker helper ---------- */
+  function buildEmojiRow(rowId, list, selected){
+    const row = document.getElementById(rowId);
+    row.innerHTML = '';
+    row.dataset.selected = selected;
+    list.forEach(em=>{
+      const d = document.createElement('div');
+      d.className = 'emoji-opt' + (em===selected ? ' sel':'');
+      d.textContent = em;
+      d.onclick = ()=>{
+        row.querySelectorAll('.emoji-opt').forEach(x=>x.classList.remove('sel'));
+        d.classList.add('sel');
+        row.dataset.selected = em;
+      };
+      row.appendChild(d);
+    });
+  }
+  function getSelectedEmoji(rowId){ return document.getElementById(rowId).dataset.selected; }
+
+  /* ---------- Overlays ---------- */
+  function showOverlay(id){ document.getElementById(id).classList.add('show'); }
+  function hideOverlay(id){ document.getElementById(id).classList.remove('show'); }
+  document.getElementById('folderOverlay').addEventListener('click', e=>{ if (e.target.id==='folderOverlay') hideOverlay('folderOverlay'); });
+  document.getElementById('padOverlay').addEventListener('click', e=>{ if (e.target.id==='padOverlay') hideOverlay('padOverlay'); });
+
+  /* ---------- Edit mode toggle ---------- */
+  const editToggle = document.getElementById('editToggle');
+  editToggle.onclick = ()=>{
+    editMode = !editMode;
+    editToggle.classList.toggle('on', editMode);
+    document.getElementById('editLabel').textContent = editMode ? 'Editando' : 'Editar';
+    renderGrid();
+  };
+
+  /* ---------- Stop button ---------- */
+  document.getElementById('stopBtn').onclick = ()=> stopAll(true);
+
+  /* ---------- Boot ---------- */
+  async function boot(){
+    db = await openDB();
+    folders = await dbGetAll('folders');
+    buttons = await dbGetAll('buttons');
+    if (folders.length === 0){
+      const f = { id: uid(), name:'General', icon:'📁' };
+      folders.push(f);
+      await dbPut('folders', f);
+    }
+    currentFolderId = folders[0].id;
+    renderFolders();
+    renderGrid();
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
