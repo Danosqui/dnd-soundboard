@@ -56,13 +56,6 @@
   .brand-title{font-size:19px;font-weight:700;letter-spacing:.2px;}
   .brand-sub{font-size:11px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase; margin-top:1px;}
 
-  .meter{display:flex; align-items:flex-end; gap:3px; height:22px;}
-  .meter i{
-    display:block; width:4px; border-radius:2px; background:var(--text-dim);
-    height:4px; transition:height .09s linear, background .2s linear;
-  }
-  .meter.live i{background:var(--accent);}
-
   .edit-toggle{
     display:flex; align-items:center; gap:8px; background:var(--panel);
     border:1px solid var(--border); border-radius:100px; padding:6px 6px 6px 12px;
@@ -153,11 +146,15 @@
   }
   .add-pad:hover{border-color:var(--accent-dim); color:var(--accent);}
 
-  /* Stop button */
+  /* Bottom bar: info · stop · editar, todo al mismo nivel */
   .stopbar{
-    position:fixed; left:0; right:0; bottom:0; display:flex; justify-content:center;
-    padding:0 0 calc(20px + env(safe-area-inset-bottom)); pointer-events:none;
+    position:fixed; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:space-between;
+    gap:10px; padding:12px 16px calc(16px + env(safe-area-inset-bottom)); pointer-events:none;
+    background:linear-gradient(to top, var(--bg) 60%, transparent);
   }
+  .bar-side{flex:1; min-width:0; pointer-events:auto;}
+  .bar-side.right{display:flex; justify-content:flex-end;}
+  .folder-info{font-size:11px; color:var(--text-dim); letter-spacing:.03em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .stopbtn{
     pointer-events:auto; display:flex; align-items:center; gap:10px; background:var(--danger);
     color:#fff; border:none; border-radius:100px; padding:15px 26px; font-size:14.5px;
@@ -232,15 +229,7 @@
       <div class="brand-mark">
         <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#1a1206" stroke-width="1.6"/><polygon points="10,8 10,16 16,12" fill="#1a1206"/></svg>
       </div>
-      <div>
-        <div class="brand-title">Pads</div>
-        <div class="brand-sub" id="folderCount">—</div>
-      </div>
-    </div>
-    <div class="meter" id="meter"></div>
-    <div class="edit-toggle" id="editToggle">
-      <span id="editLabel">Editar</span>
-      <span class="sw"></span>
+      <div class="brand-title">Pads</div>
     </div>
   </header>
 
@@ -255,9 +244,16 @@
   </main>
 
   <div class="stopbar">
+    <div class="bar-side left"><div class="folder-info mono" id="folderCount">—</div></div>
     <button class="stopbtn" id="stopBtn" disabled>
       <span class="sq"></span> Detener todo
     </button>
+    <div class="bar-side right">
+      <div class="edit-toggle" id="editToggle">
+        <span id="editLabel">Editar</span>
+        <span class="sw"></span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -309,6 +305,15 @@
         <div class="switch on" id="padInterruptSwitch"></div>
       </div>
     </div>
+    <div class="field">
+      <div class="toggle-row" id="padLoopRow">
+        <div>
+          <div class="t">Repetir en bucle</div>
+          <div class="d">El audio se repite sin parar hasta que lo detengas o toques otro pad que lo interrumpa. No aplica el fade automático de final.</div>
+        </div>
+        <div class="switch" id="padLoopSwitch"></div>
+      </div>
+    </div>
     <div class="sheet-actions">
       <button class="btn ghost" id="padCancel">Cancelar</button>
       <button class="btn primary" id="padSave" disabled>Guardar</button>
@@ -319,7 +324,9 @@
 <script>
 (function(){
   "use strict";
-  const FADE_MS = 400;
+  // ---- Duraciones de fade (en milisegundos). Cambiar estos dos valores para ajustar. ----
+  const FADE_IN_MS  = 400;   // fade al empezar a sonar
+  const FADE_OUT_MS = 4000;  // fade al detener (manual, por interrupción, o al terminar naturalmente)
   const EMOJIS_PAD = ['🎵','🎶','🥁','🎺','🎸','🔊','🎉','😂','👏','⚡','🔥','💥','🚨','🐸','🚀','⏱️','🌊','🎤','🎬','❤️'];
   const EMOJIS_FOLDER = ['📁','🎵','🎬','🎉','⚡','🎮','🎙️','📻','🐾','🏆'];
 
@@ -406,9 +413,9 @@
       try{
         p.gain.gain.cancelScheduledValues(now);
         p.gain.gain.setValueAtTime(p.gain.gain.value, now);
-        p.gain.gain.linearRampToValueAtTime(0.0001, now + FADE_MS/1000);
+        p.gain.gain.linearRampToValueAtTime(0.0001, now + FADE_OUT_MS/1000);
       }catch(e){}
-      setTimeout(()=>{ try{ p.audio.pause(); }catch(e){} }, FADE_MS + 30);
+      setTimeout(()=>{ try{ p.audio.pause(); }catch(e){} }, FADE_OUT_MS + 30);
     } else {
       try{ p.audio.pause(); }catch(e){}
     }
@@ -435,19 +442,17 @@
     const url = URL.createObjectURL(btn.audioBlob);
     const audio = new Audio(url);
     audio.preload = 'auto';
-    let source, gain, analyser;
+    audio.loop = !!btn.loop;
+    let source, gain;
     try{
       source = ctx.createMediaElementSource(audio);
       gain = ctx.createGain();
-      analyser = ctx.createAnalyser();
-      analyser.fftSize = 32;
       gain.gain.value = 0.0001;
       source.connect(gain);
-      gain.connect(analyser);
-      analyser.connect(ctx.destination);
+      gain.connect(ctx.destination);
     }catch(e){ console.error(e); return; }
 
-    const p = { audio, gain, source, analyser, ctx, fadeOutTimer:null };
+    const p = { audio, gain, source, ctx, fadeOutTimer:null };
     players.set(btn.id, p);
 
     audio.addEventListener('canplay', ()=>{
@@ -455,13 +460,15 @@
       const now = ctx.currentTime;
       gain.gain.cancelScheduledValues(now);
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(1, now + FADE_MS/1000);
+      gain.gain.linearRampToValueAtTime(1, now + FADE_IN_MS/1000);
     }, {once:true});
 
     audio.addEventListener('timeupdate', ()=>{
+      if (btn.loop) return; // en loop no hay "final": solo termina al detenerlo (con su propio fade out)
       if (!isFinite(audio.duration)) return;
       const remaining = audio.duration - audio.currentTime;
-      if (remaining <= (FADE_MS/1000) + 0.05 && !p.fadingOut){
+      const fadeSec = Math.min(FADE_OUT_MS/1000, audio.duration/2);
+      if (remaining <= fadeSec + 0.05 && !p.fadingOut){
         p.fadingOut = true;
         const now = ctx.currentTime;
         try{
@@ -491,33 +498,6 @@
     const el = document.querySelector(`.pad[data-id="${buttonId}"]`);
     if (el) el.classList.toggle('playing', playing);
   }
-
-  /* ---------- Level meter (signature element) ---------- */
-  const meterEl = document.getElementById('meter');
-  const BAR_COUNT = 10;
-  for (let i=0;i<BAR_COUNT;i++){ const b=document.createElement('i'); meterEl.appendChild(b); }
-  const bars = Array.from(meterEl.children);
-  const meterData = new Uint8Array(16);
-  function meterLoop(){
-    let level = 0;
-    if (players.size){
-      let sum = 0, n = 0;
-      players.forEach(p=>{
-        p.analyser.getByteFrequencyData(meterData);
-        let s=0; for (let i=0;i<meterData.length;i++) s+=meterData[i];
-        sum += s/meterData.length; n++;
-      });
-      level = n ? sum/n/255 : 0;
-    }
-    meterEl.classList.toggle('live', players.size>0);
-    bars.forEach((b,i)=>{
-      const wave = Math.sin(Date.now()/150 + i*0.9) * 0.15;
-      const target = players.size ? Math.max(4, (level + wave) * 22) : 4;
-      b.style.height = Math.max(4, Math.min(22, target)) + 'px';
-    });
-    requestAnimationFrame(meterLoop);
-  }
-  requestAnimationFrame(meterLoop);
 
   /* ---------- Rendering ---------- */
   function renderFolders(){
@@ -561,7 +541,7 @@
         <div class="led"></div>
         <div class="icon">${btn.icon}</div>
         <div class="name">${escapeHtml(btn.name)}</div>
-        <div class="mode-tag mono">${btn.interrupt ? 'CORTA' : 'CAPA'}</div>
+        <div class="mode-tag mono">${btn.interrupt ? 'CORTA' : 'CAPA'}${btn.loop ? ' · ↻' : ''}</div>
         <div class="edit-btn">
           <div class="ic edit" title="Editar">✎</div>
           <div class="ic del" title="Eliminar">🗑</div>
@@ -628,6 +608,7 @@
     document.getElementById('padFileLabel').textContent = 'Elegir archivo de audio';
     document.getElementById('padFileBtn').classList.remove('has');
     setInterruptSwitch(true);
+    setLoopSwitch(false);
     buildEmojiRow('padEmojiRow', EMOJIS_PAD, EMOJIS_PAD[0]);
     validatePadForm();
     showOverlay('padOverlay');
@@ -639,6 +620,7 @@
     document.getElementById('padFileLabel').textContent = pendingFileName;
     document.getElementById('padFileBtn').classList.add('has');
     setInterruptSwitch(btn.interrupt);
+    setLoopSwitch(!!btn.loop);
     buildEmojiRow('padEmojiRow', EMOJIS_PAD, btn.icon);
     validatePadForm();
     showOverlay('padOverlay');
@@ -646,10 +628,14 @@
   function setInterruptSwitch(on){
     document.getElementById('padInterruptSwitch').classList.toggle('on', on);
   }
-  document.getElementById('padInterruptRow').onclick = (e)=>{
-    if (e.target.closest('.switch') === null && e.target.id !== 'padInterruptRow') { /* allow row click too */ }
-    const sw = document.getElementById('padInterruptSwitch');
-    sw.classList.toggle('on');
+  function setLoopSwitch(on){
+    document.getElementById('padLoopSwitch').classList.toggle('on', on);
+  }
+  document.getElementById('padInterruptRow').onclick = ()=>{
+    document.getElementById('padInterruptSwitch').classList.toggle('on');
+  };
+  document.getElementById('padLoopRow').onclick = ()=>{
+    document.getElementById('padLoopSwitch').classList.toggle('on');
   };
   document.getElementById('padFileBtn').onclick = ()=> document.getElementById('padFileInput').click();
   document.getElementById('padFileInput').onchange = (e)=>{
@@ -671,14 +657,15 @@
     if (!name || !pendingBlob) return;
     const icon = getSelectedEmoji('padEmojiRow') || EMOJIS_PAD[0];
     const interrupt = document.getElementById('padInterruptSwitch').classList.contains('on');
+    const loop = document.getElementById('padLoopSwitch').classList.contains('on');
     if (padEditingId){
       const btn = buttons.find(b=>b.id===padEditingId);
-      btn.name = name; btn.icon = icon; btn.interrupt = interrupt;
+      btn.name = name; btn.icon = icon; btn.interrupt = interrupt; btn.loop = loop;
       btn.audioBlob = pendingBlob; btn.fileName = pendingFileName;
       await dbPut('buttons', btn);
       stopPlayer(btn.id, false);
     } else {
-      const btn = { id: uid(), folderId: currentFolderId, name, icon, interrupt, audioBlob: pendingBlob, fileName: pendingFileName };
+      const btn = { id: uid(), folderId: currentFolderId, name, icon, interrupt, loop, audioBlob: pendingBlob, fileName: pendingFileName };
       await dbPut('buttons', btn);
       buttons.push(btn);
     }
