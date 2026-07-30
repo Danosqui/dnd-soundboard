@@ -431,14 +431,28 @@
     if (!btn.audioBlob) return;
     const ctx = getAudioCtx();
 
-    // retrigger: stop this same pad's own instance immediately (quick fade)
-    if (players.has(btn.id)) stopPlayer(btn.id, true);
+    let needsWait = false;
 
-    // interrupt behavior: stop every other currently playing pad
+    // retrigger: stop this same pad's own instance immediately (quick fade)
+    if (players.has(btn.id)){ stopPlayer(btn.id, true); needsWait = true; }
+
+    // interrupt behavior: stop every other currently playing pad, and wait for its fade out
     if (btn.interrupt){
-      Array.from(players.keys()).forEach(id => { if (id !== btn.id) stopPlayer(id, true); });
+      const others = Array.from(players.keys()).filter(id => id !== btn.id);
+      if (others.length){
+        others.forEach(id => stopPlayer(id, true));
+        needsWait = true;
+      }
     }
 
+    if (needsWait){
+      setTimeout(()=> startPlayback(btn, ctx), FADE_OUT_MS);
+    } else {
+      startPlayback(btn, ctx);
+    }
+  }
+
+  function startPlayback(btn, ctx){
     const url = URL.createObjectURL(btn.audioBlob);
     const audio = new Audio(url);
     audio.preload = 'auto';
